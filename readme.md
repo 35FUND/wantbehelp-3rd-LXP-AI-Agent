@@ -86,13 +86,17 @@ Inspector AI Agent는 다음 4가지 카테고리를 기준으로 영상을 평�
     2. 패키지 설치
     Bash
 
-    pip install -r requirements.txt
+    uv sync
     3. 서버 실행
     Bash
 
     uvicorn app.main:app --reload
     ```
 
+    패키지 설치 목록
+    ```bash
+    uv add fastapi uvicorn google-generativeai boto3 pydantic-settings python-multipart asyncio
+    ```
 ## 📤 API 사용법 (Example)
 `POST /check-video`
 

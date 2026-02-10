@@ -4,19 +4,17 @@ import os
 import boto3
 from app.core import settings
 from botocore.exceptions import ClientError
-from dotenv import load_dotenv
-
-load_dotenv()
 
 class BaseGeminiService :
     """
     공통 Gemini 서비스 로직
     """
-    def __init__(self) :
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    def __init__(self, api_key: str) :
+        self.api_key = api_key
+        genai.configure(api_key=self.api_key)
         self.generation_config = {"response_mime_type" : "application/json"}
         self.model = genai.GenerativeModel(
-            model_name=os.environ.get("MODEL_NAME")
+            model_name=settings.MODEL_NAME
         )
 
         self.s3_client = boto3.client(

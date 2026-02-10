@@ -2,6 +2,7 @@ import json
 import uuid
 import os
 import tempfile
+import asyncio
 from fastapi import HTTPException
 from pathlib import Path
 from .base import BaseGeminiService
@@ -21,7 +22,7 @@ class InspectorService(BaseGeminiService):
             InspectorResult: 검수 결과 데이터 스키마
         """
         # 1. 로컬 경로 설정
-        local_temp_path = _get_unique_temp_path(s3_key)
+        local_temp_path = self._get_unique_temp_path(s3_key)
         video_file = None
         
         try:
@@ -45,18 +46,35 @@ class InspectorService(BaseGeminiService):
                 self.delete_remote_file(video_file.name)
 
 
-def _get_unique_temp_path(original_filename: str) -> str:
-    """
-    고유한 UUID 파일명을 생성합니다.
-    예: my_video.mp4 -> /tmp/7b9f1...8e2.mp4
-    """
-    # 1. 파일 확장자 추출 (.mp4 등)
-    extension = Path(original_filename).suffix
+    def _get_unique_temp_path(original_filename: str) -> str:
+        """
+        고유한 UUID 파일명을 생성합니다.
+        예: my_video.mp4 -> /tmp/7b9f1...8e2.mp4
+        """
+        # 1. 파일 확장자 추출 (.mp4 등)
+        extension = Path(original_filename).suffix
+        
+        # 2. UUID 생성 및 확장자 결합
+        unique_filename = f"{uuid.uuid4()}{extension}"
+        
+        # 3. 시스템의 임시 디렉토리(OS 독립적)와 결합
+        # 리눅스는 보통 /tmp, 윈도우는 Temp 폴더로 자동 지정됨
+        temp_dir = Path(tempfile.gettempdir()) 
+        return str(temp_dir / unique_filename)
     
-    # 2. UUID 생성 및 확장자 결합
-    unique_filename = f"{uuid.uuid4()}{extension}"
-    
-    # 3. 시스템의 임시 디렉토리(OS 독립적)와 결합
-    # 리눅스는 보통 /tmp, 윈도우는 Temp 폴더로 자동 지정됨
-    temp_dir = Path(tempfile.gettempdir()) 
-    return str(temp_dir / unique_filename)
+    async def inspect_video_mock(self, s3_key: str) -> InspectorResult:
+        """실제 AI를 호출하지 않고 가짜 데이터를 반환하는 테스트용 메서드"""
+        
+        # 1. 실제 로직처럼 약간의 대기 시간을 줌 (0.5초)
+        await asyncio.sleep(0.5)
+        
+        # 2. 우리가 정의한 스키마에 맞는 가짜 데이터 생성
+        fake_data = {
+            "is_it_education": True,
+            "confidence_score": 0.98,
+            "category": "ai", # 혹은 "web", "cloud" 등 테스트하고 싶은 값
+            "reason": f"테스트 모드입니다. 입력받은 S3 경로는 {s3_key}이며, 화면에서 파이썬 코드가 감지된 것으로 가정합니다."
+        }
+        
+        # 3. Pydantic으로 검증하며 객체 생성 (여기서 에러 안 나면 스키마 설계 성공!)
+        return InspectorResult(**fake_data)

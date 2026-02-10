@@ -17,6 +17,11 @@ class InspectorResult(BaseModel) :
     ] = Field(..., description="영상 핵심 카테고리")
     reason: str = Field(..., description="검수 사유")
 
+class InspectorResponse(BaseModel):
+    status: str
+    data: InspectorResult
+    message: str
+    
 # 출력용 매핑
 CATEGORY_MAP = {
     "web": "웹 개발", "mobile": "모바일", "game": "게임 개발", 

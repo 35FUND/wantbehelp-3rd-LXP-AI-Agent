@@ -7,8 +7,9 @@ class Settings(BaseSettings) :
     AWS_SECRET_ACCESS_KEY: str
     AWS_REGION: str = "ap-northeast-2"
     S3_BUCKET_NAME: str
-
+    MODEL_NAME: str
     class Config :
         env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()

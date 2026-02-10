@@ -1,1 +1,1 @@
-from inspector_service import InspectorService
+from .inspector_service import InspectorService
