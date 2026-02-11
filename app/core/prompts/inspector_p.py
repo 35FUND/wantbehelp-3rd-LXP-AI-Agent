@@ -21,12 +21,6 @@ IT_INSPECTOR_PROMPT = """
 14. 커리어 (career): IT 취업/이직, 포트폴리오, 면접 가이드
 15. 업무 꿀팁 (tips): 협업 툴(Notion, Jira), 생산성 향상
 
-[추천 키워드 추출 가이드]
-영상의 내용을 분석하여 다음 기준에 부합하는 키워드를 1~5개 추출하세요:
-1. 핵심성: 영상의 주제를 가장 잘 나타내는 기술 스택, 라이브러리, 개념명 (예: 'React', 'Docker', '비동기 처리')
-2. 검색성: 해당 분야 종사자들이 지식을 찾기 위해 실제 검색창에 입력할 법한 단어
-3. 구체성: 너무 포괄적인 단어(예: '코딩', 'IT')보다는 구체적인 단어(예: 'FastAPI', 'DDD') 선호
-
 [판단 지표: 증거 기반]
 - 시각(Visual Evidence): 코드, 도식(Diagram: 아키텍처/ERD/플로우/시퀀스 등), 대시보드, IDE/터미널, 클라우드 콘솔, 전문 협업 툴, 기술 슬라이드 중 하나라도 '학습 맥락'에서 노출되는가?
 - 청각(Audio Evidence): IT 실무와 관련된 개념, 용어, 절차, 사례, 데모가 전달되는가?
@@ -46,5 +40,5 @@ IT_INSPECTOR_PROMPT = """
 }
 
 [추가 지시]
-- is_it_education이 false인 경우, category는 반드시 "None", recommend_keywords는 빈 리스트 []로 표기할 것.
+- is_it_education이 false인 경우, category는 반드시 "None"으로 표기할 것.
 """
