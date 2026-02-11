@@ -95,7 +95,7 @@ Inspector AI Agent는 다음 4가지 카테고리를 기준으로 영상을 평�
 
     패키지 설치 목록
     ```bash
-    uv add fastapi uvicorn google-generativeai boto3 pydantic-settings python-multipart asyncio
+    uv add fastapi uvicorn google-generativeai boto3 pydantic-settings python-multipart asyncio sqlmodel aiomysql
     ```
 ## 📤 API 사용법 (Example)
 `POST /check-video`

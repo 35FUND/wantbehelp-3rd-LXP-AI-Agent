@@ -36,7 +36,7 @@ class BaseGeminiService :
             str: 다운로드된 파일의 로컬 경로
         """
         try :
-            self.s3_client.download_file(settings.S3_BUCKET_NAME. s3_key, local_path)
+            self.s3_client.download_file(settings.S3_BUCKET_NAME, s3_key, local_path)
             return local_path
         except ClientError as e :
             raise Exception(f"S3 Download Failed: {str(e)}")

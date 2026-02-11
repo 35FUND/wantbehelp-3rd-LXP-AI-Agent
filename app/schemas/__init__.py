@@ -1,1 +1,1 @@
-from .inspector_sh import InspectorResult
+from .inspector_sh import InspectionResult, APIResponse, CATEGORY_MAP

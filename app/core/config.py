@@ -8,6 +8,8 @@ class Settings(BaseSettings) :
     AWS_REGION: str = "ap-northeast-2"
     S3_BUCKET_NAME: str
     MODEL_NAME: str
+    DATABASE_URL: str
+    SHORTS_DIR: str
     class Config :
         env_file = ".env"
         extra = "ignore"
