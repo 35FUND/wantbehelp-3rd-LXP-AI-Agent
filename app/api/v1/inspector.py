@@ -1,7 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from app.services.inspector_service import InspectorService
-from app.schemas.inspector_sh import InspectorResult, InspectorResponse, CATEGORY_MAP
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Annotated
+
 from app.core.config import settings
+from app.models.database import get_session
+from app.schemas.inspector_sh import APIResponse, CATEGORY_MAP
+from app.services.inspector_service import InspectorService
 
 router = APIRouter()
 
@@ -9,32 +13,36 @@ router = APIRouter()
 def get_inspector_service():
     return InspectorService(api_key=settings.GEMINI_API_KEY)
 
-@router.post("/inspect", response_model=InspectorResponse)
-async def inspect_video(
-    s3_key: str, 
-    service: InspectorService = Depends(get_inspector_service)
-):
+@router.post("/inspect/{shorts_id}", response_model = APIResponse)
+async def inspect_shorts(
+    shorts_id: int,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    service: Annotated[InspectorService, Depends(get_inspector_service)]
+) :
     """
-    S3에 업로드된 영상을 Gemini AI가 검수
+    임의의 숏츠 ID를 받아 AI 영상 검수 프로세스 실행
     
     Args:
-        s3_key: S3 버킷 내의 파일 경로 (예: 'uploads/lecture_01.mp4')
-    """
-    try:
-        # 서비스 호출 (S3 다운로드 -> Gemini 업로드 -> 분석 -> 삭제)
-        # result: InspectorResult = await service.inspect_video_from_s3(s3_key)
-        result: InspectorResult = await service.inspect_video_mock(s3_key)
-        
-        # 결과 가공 (사용자에게 줄 상태 메시지 결정)
-        status = "Approved" if result.is_it_education else "Rejected"
-        
-        return InspectorResponse(
-            status=status,
-            data=result,
-            message=f"검수가 완료되었습니다. 결과: {CATEGORY_MAP.get(result.category, '알 수 없음')}"
-        )
+        shorts_id (int): 검수 대상 숏츠 ID
+        session (AsyncSession): 비동기 DB 세션
+        service (InspectorService): 영상 검수 서비스 인스턴스
 
-    except Exception as e:
-        # 상세한 에러 로그는 서버 콘솔에 남기고, 클라이언트에게는 500 에러 반환
-        print(f"[ERROR] Inspection Failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="영상 검수 중 오류가 발생했습니다.")
+    Returns:
+        InspectorResponse: 검수 결과 응답 모델
+    """
+
+    try:
+        inspection_result = await service.run_process_inspection(session, shorts_id)
+
+        status = inspection_result.inspection_status
+        
+        return APIResponse(
+            status = status,
+            data = inspection_result,
+            message = f"[Shorts id : {shorts_id}] 검수가 완료되었습니다. 상태: {status}"
+        )
+    
+    except HTTPException as he :
+        raise he
+    except Exception as e :
+        raise HTTPException(status_code=500, detail=f"영상 검수 중 오류 발생: {str(e)}")

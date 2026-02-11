@@ -1,7 +1,7 @@
-from pydantic import BaseModel, Field
-from typing import Literal
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Literal, List
 
-class InspectorResult(BaseModel) :
+class InspectionResult(BaseModel) :
     """
     영상 검수 결과 스키마
 
@@ -11,15 +11,16 @@ class InspectorResult(BaseModel) :
     """
     is_it_education: bool = Field(..., description="IT 교육용 여부")
     confidence_score: float = Field(..., ge=0, le=1)
+    reason: str = Field(..., description="검수 사유")
     category: Literal["web", "mobile", "game", "cloud", "devops", 
         "ai", "ax", "security", "network", "hw", "iot", 
         "planning", "design", "career", "tips", "None"
     ] = Field(..., description="영상 핵심 카테고리")
-    reason: str = Field(..., description="검수 사유")
 
-class InspectorResponse(BaseModel):
+    model_config = ConfigDict(from_attributes = True)
+class APIResponse(BaseModel):
     status: str
-    data: InspectorResult
+    data: InspectionResult
     message: str
     
 # 출력용 매핑

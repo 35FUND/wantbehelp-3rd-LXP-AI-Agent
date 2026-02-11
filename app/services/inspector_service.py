@@ -1,52 +1,105 @@
-import json
-import uuid
-import os
-import tempfile
-import asyncio
+import json, uuid, os, tempfile
 from fastapi import HTTPException
 from pathlib import Path
+from datetime import datetime
+from app.core import settings
 from .base import BaseGeminiService
 from app.core.prompts.inspector_p import IT_INSPECTOR_PROMPT
-from app.schemas.inspector_sh import InspectorResult
+from app.schemas.inspector_sh import InspectionResult
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.shorts import Shorts
+from app.models.shorts_inspection_result import ShortsInspectionResult
+import logging
+
+logger = logging.getLogger(__name__)
 
 class InspectorService(BaseGeminiService):
     """영상 검수 에이전트 서비스"""
-    async def inspect_video_from_s3(self, s3_key: str) -> InspectorResult:
-        """
-        S3에 저장된 영상을 Gemini로 검수하고 결과 반환
 
+    async def run_process_inspection(self, session: AsyncSession, shorts_id: int) -> InspectionResult :
+        """숏츠 검수 전체 프로세스 실행
+        비디오 조회 -> AI 분석 -> 결과 DB 저장
+
+        Args:
+            session (AsyncSession): 비동기 DB 세션
+            shorts_id (int): 검수 대상 숏츠 ID
+
+        Returns:
+            InspectionResult: 저장된 검수 결과 객체
+        """
+        shorts = await session.get(Shorts, shorts_id)
+        if not shorts :
+            raise HTTPException(status_code = 404, detail=f"[Shorts id : {shorts_id}] 검수 대상 숏츠를 찾을 수 없습니다.")
+        
+        s3_key = settings.SHORTS_DIR + shorts.video_url.split("/")[-1]
+        logger.error(f"s3_key : {s3_key}")
+        analysis_result = await self._analyze_with_gemini(s3_key)
+
+        return await self._save_inspection_result(session, shorts, analysis_result)
+
+
+    async def _analyze_with_gemini(self, s3_key: str) -> InspectionResult :
+        """S3 파일을 Gemini로 분석하여 구조화된 결과를 반환합니다
+        
         Args:
             s3_key (str): S3 버킷 내 파일 키
 
         Returns:
             InspectorResult: 검수 결과 데이터 스키마
         """
-        # 1. 로컬 경로 설정
         local_temp_path = self._get_unique_temp_path(s3_key)
-        video_file = None
-        
-        try:
-            # S3에서 파일 가져오기
-            await self.download_from_s3(s3_key, local_temp_path)
+        shorts_file = None
 
-            # Gemini 업로드 및 대기
+        try :
+            await self.download_from_s3(s3_key, local_temp_path)
             video_file = await self.upload_and_wait(local_temp_path)
 
-            # 분석 수행
-            response = self.model.generate_content([video_file, IT_INSPECTOR_PROMPT])
-            validated_data = InspectorResult(**json.loads(response.text))
-            
-            return validated_data
+            response = self.model.generate_content(
+                [video_file, IT_INSPECTOR_PROMPT],
+                generation_config = self.generation_config
+            )
 
-        finally:
-            # 모든 리소스 정리 (로컬 임시 파일 + Gemini 원격 파일)
-            if os.path.exists(local_temp_path):
+            return InspectionResult(**json.loads(response.text))
+        
+        finally :
+            # 리소스 정리
+            if os.path.exists(local_temp_path) :
                 os.remove(local_temp_path)
-            if video_file:
-                self.delete_remote_file(video_file.name)
+            if shorts_file :
+                self.delete_remote_file(shorts_file.name)
 
 
-    def _get_unique_temp_path(original_filename: str) -> str:
+    async def _save_inspection_result(self, session: AsyncSession, shorts: Shorts, result: InspectionResult) :
+        """검수 결과를 DB에 저장
+        
+        Args:
+            session (AsyncSession): 비동기 DB 세션
+            shorts (Shorts): 검수 대상 Shorts 객체
+            result (InspectionResult): Gemini 분석 결과
+
+        Returns:
+            InspectionResult: 저장된 검수 결과 객체
+        """
+        inspection_status = "Approved" if result.is_it_education else "Rejected"
+
+        new_inspection = ShortsInspectionResult(
+            shorts_id = shorts.id,
+            inspection_status = inspection_status,
+            category = result.category,
+            confidence_score = result.confidence_score,
+            reason = result.reason,
+            created_at = datetime.now()
+        )
+
+        # TODO: Shorts 상태 업데이트(AI 검수 완료 / 반려 등)
+
+        session.add(new_inspection)
+        await session.commit()
+        await session.refresh(new_inspection)
+
+        return new_inspection
+
+    def _get_unique_temp_path(self, original_filename: str) -> str:
         """
         고유한 UUID 파일명을 생성합니다.
         예: my_video.mp4 -> /tmp/7b9f1...8e2.mp4
@@ -61,20 +114,3 @@ class InspectorService(BaseGeminiService):
         # 리눅스는 보통 /tmp, 윈도우는 Temp 폴더로 자동 지정됨
         temp_dir = Path(tempfile.gettempdir()) 
         return str(temp_dir / unique_filename)
-    
-    async def inspect_video_mock(self, s3_key: str) -> InspectorResult:
-        """실제 AI를 호출하지 않고 가짜 데이터를 반환하는 테스트용 메서드"""
-        
-        # 1. 실제 로직처럼 약간의 대기 시간을 줌 (0.5초)
-        await asyncio.sleep(0.5)
-        
-        # 2. 우리가 정의한 스키마에 맞는 가짜 데이터 생성
-        fake_data = {
-            "is_it_education": True,
-            "confidence_score": 0.98,
-            "category": "ai", # 혹은 "web", "cloud" 등 테스트하고 싶은 값
-            "reason": f"테스트 모드입니다. 입력받은 S3 경로는 {s3_key}이며, 화면에서 파이썬 코드가 감지된 것으로 가정합니다."
-        }
-        
-        # 3. Pydantic으로 검증하며 객체 생성 (여기서 에러 안 나면 스키마 설계 성공!)
-        return InspectorResult(**fake_data)
