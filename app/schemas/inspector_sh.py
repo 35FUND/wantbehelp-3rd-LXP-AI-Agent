@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Literal, List
+from typing import Literal, Any
 
 class InspectionResult(BaseModel) :
     """
@@ -20,7 +20,7 @@ class InspectionResult(BaseModel) :
     model_config = ConfigDict(from_attributes = True)
 class APIResponse(BaseModel):
     status: str
-    data: InspectionResult
+    data: Any
     message: str
     
 # 출력용 매핑

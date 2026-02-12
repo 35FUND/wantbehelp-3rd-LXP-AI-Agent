@@ -1,1 +1,2 @@
+from .inspector_ai_service import InspectorAIService
 from .inspector_service import InspectorService
