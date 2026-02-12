@@ -44,6 +44,21 @@ async def auto_inspection_job() :
 def start_scheduler() :
     """스케줄러 시작 시간 설정"""
 
-    scheduler.add_job(auto_inspection_job, "interval", minutes = 1)
+    scheduler.add_job(
+        auto_inspection_job, 
+        "interval", 
+        days=settings.INSPECTOR_JOB_INTERVAL_DAYS,
+        hours=settings.INSPECTOR_JOB_INTERVAL_HOURS,
+        minutes=settings.INSPECTOR_JOB_INTERVAL_MINUTES,
+        seconds=settings.INSPECTOR_JOB_INTERVAL_SECONDS,
+        id="video_inspection_job",
+        replace_existing=True
+    )
     scheduler.start()
-    logger.info("### 숏츠 검수 스케줄러 시작 ###")
+    logger.info(
+        f"### 비디오 검수 스케줄러 시작됨 "
+        f"(주기: {settings.INSPECTOR_JOB_INTERVAL_DAYS}일 "
+        f"{settings.INSPECTOR_JOB_INTERVAL_HOURS}시간 "
+        f"{settings.INSPECTOR_JOB_INTERVAL_MINUTES}분 "
+        f"{settings.INSPECTOR_JOB_INTERVAL_SECONDS}초) ###"
+    )

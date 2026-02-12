@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from app.core.config import settings
 
 # mysql+aiomysql://user:pass@localhost:3306/dbname
-engine = create_async_engine(settings.DATABASE_URL, echo=True)
+engine = create_async_engine(settings.DATABASE_URL, echo = False)
 async_session = sessionmaker(
     engine, 
     class_=AsyncSession, 
