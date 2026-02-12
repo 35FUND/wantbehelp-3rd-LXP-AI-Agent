@@ -17,7 +17,9 @@ class ShortsInspectionResult(SQLModel, table = True) :
 
     id: Optional[int] = Field(default = None, primary_key = True)
     shorts_id: int = Field(foreign_key = "shorts.id", index = True)
-    
+    title: str = Field(..., description = "숏츠 제목")
+    author: str = Field(..., description = "작성자 이름")
+
     inspection_status: str # Approved, Rejected
     category: str
     confidence_score: float
