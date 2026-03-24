@@ -1,7 +1,12 @@
+import enum
 from sqlmodel import SQLModel, Field
 from sqlalchemy import Column, Text
 from datetime import datetime
 from typing import Optional
+
+class InspectionStatus(str, enum.Enum):
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 class ShortsInspectionResult(SQLModel, table = True) :
     """
@@ -20,7 +25,7 @@ class ShortsInspectionResult(SQLModel, table = True) :
     title: str = Field(..., description = "숏츠 제목")
     author: str = Field(..., description = "작성자 이름")
 
-    inspection_status: str # Approved, Rejected
+    inspection_status: str
     category: str
     confidence_score: float
     reason: str = Field(sa_column=Column(Text(collation="utf8mb4_unicode_ci")))
@@ -29,8 +34,12 @@ class ShortsInspectionResult(SQLModel, table = True) :
 
     @property
     def is_it_education(self) -> bool :
-        return self.inspection_status == "Approved"
+        return self.inspection_status == InspectionStatus.APPROVED.value
     
     @is_it_education.setter
     def is_it_education(self, value: bool) :
-        self.inspection_status = "Approved" if value else "Rejected"
+        self.inspection_status = (
+            InspectionStatus.APPROVED.value
+            if value
+            else InspectionStatus.REJECTED.value
+        )

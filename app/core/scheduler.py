@@ -17,7 +17,7 @@ async def auto_inspection_job() :
     async with get_session_for_scheduler() as session :
         statement = (
             select(Shorts)
-            .where(Shorts.status == "PENDING")
+            .where(Shorts.status == settings.INSPECTION_PENDING_STATUS)
             .options(selectinload(Shorts.author))
             .limit(5)
         )
@@ -38,7 +38,7 @@ async def auto_inspection_job() :
                 logger.info(f"[Scheduler] Shorts ID {shorts.id} 검수가 완료되었습니다.")
             except Exception as e :
                 logger.error(f"[Scheduler] Shorts ID {shorts.id} 검수 중 오류 : {str(e)}")
-                shorts.status = "REJECT"
+                shorts.status = settings.SHORTS_REJECTED_STATUS
                 await session.commit()
 
 def start_scheduler() :

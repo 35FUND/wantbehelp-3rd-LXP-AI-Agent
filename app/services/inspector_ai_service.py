@@ -4,13 +4,14 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from pathlib import Path
 from datetime import datetime
+from urllib.parse import unquote, urlparse
 from app.core import settings
 from .base import BaseGeminiService
 from app.core.prompts.inspector_p import IT_INSPECTOR_PROMPT
 from app.schemas.inspector_sh import InspectionResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.shorts import Shorts
-from app.models.shorts_inspection_result import ShortsInspectionResult
+from app.models.shorts_inspection_result import InspectionStatus, ShortsInspectionResult
 import logging
 
 logger = logging.getLogger(__name__)
@@ -39,8 +40,8 @@ class InspectorAIService(BaseGeminiService):
 
         if not shorts :
             raise HTTPException(status_code = 404, detail=f"[Shorts id : {shorts_id}] 검수 대상 숏츠를 찾을 수 없습니다.")
-        
-        s3_key = settings.SHORTS_DIR + shorts.video_url.split("/")[-1]
+
+        s3_key = self._resolve_s3_key(shorts.video_url)
         analysis_result = await self._analyze_with_gemini(s3_key)
 
         return await self._save_inspection_result(session, shorts, analysis_result)
@@ -56,14 +57,14 @@ class InspectorAIService(BaseGeminiService):
             InspectorResult: 검수 결과 데이터 스키마
         """
         local_temp_path = self._get_unique_temp_path(s3_key)
-        shorts_file = None
+        remote_file = None
 
         try :
             await self.download_from_s3(s3_key, local_temp_path)
-            video_file = await self.upload_and_wait(local_temp_path)
+            remote_file = await self.upload_and_wait(local_temp_path)
 
             response = self.model.generate_content(
-                [video_file, IT_INSPECTOR_PROMPT],
+                [remote_file, IT_INSPECTOR_PROMPT],
                 generation_config = self.generation_config
             )
 
@@ -73,8 +74,8 @@ class InspectorAIService(BaseGeminiService):
             # 리소스 정리
             if os.path.exists(local_temp_path) :
                 os.remove(local_temp_path)
-            if shorts_file :
-                self.delete_remote_file(shorts_file.name)
+            if remote_file :
+                self.delete_remote_file(remote_file.name)
 
 
     async def _save_inspection_result(self, session: AsyncSession, shorts: Shorts, result: InspectionResult) :
@@ -88,7 +89,11 @@ class InspectorAIService(BaseGeminiService):
         Returns:
             InspectionResult: 저장된 검수 결과 객체
         """
-        inspection_status = "Approved" if result.is_it_education else "Rejected"
+        inspection_status = (
+            InspectionStatus.APPROVED.value
+            if result.is_it_education
+            else InspectionStatus.REJECTED.value
+        )
         author_name = shorts.author.nickname if shorts.author else "Unknown"
         
         new_inspection = ShortsInspectionResult(
@@ -102,8 +107,11 @@ class InspectorAIService(BaseGeminiService):
             created_at = datetime.now()
         )
 
-        # TODO: Shorts 상태 업데이트(AI 검수 완료 / 반려 등)
-        shorts.status = "AI_CHECK"
+        shorts.status = (
+            settings.SHORTS_APPROVED_STATUS
+            if result.is_it_education
+            else settings.SHORTS_REJECTED_STATUS
+        )
         shorts.updated_at = datetime.now()
 
         session.add(new_inspection)
@@ -128,3 +136,18 @@ class InspectorAIService(BaseGeminiService):
         # 리눅스는 보통 /tmp, 윈도우는 Temp 폴더로 자동 지정됨
         temp_dir = Path(tempfile.gettempdir()) 
         return str(temp_dir / unique_filename)
+
+    def _resolve_s3_key(self, video_url: str | None) -> str:
+        if not video_url:
+            raise HTTPException(status_code=400, detail="검수 대상 숏츠의 video_url 이 비어 있습니다.")
+
+        parsed = urlparse(video_url)
+        raw_path = parsed.path if parsed.scheme else video_url
+        normalized_path = unquote(raw_path).lstrip("/")
+
+        if settings.SHORTS_DIR and normalized_path.startswith(settings.SHORTS_DIR):
+            return normalized_path
+
+        filename = Path(normalized_path).name
+        prefix = settings.SHORTS_DIR.strip("/")
+        return f"{prefix}/{filename}" if prefix else filename

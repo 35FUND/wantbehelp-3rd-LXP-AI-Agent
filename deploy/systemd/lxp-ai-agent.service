@@ -1,0 +1,15 @@
+[Unit]
+Description=LXP AI Agent FastAPI service
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/wantbehelp-3rd-LXP-AI-Agent
+Environment=PATH=/home/ec2-user/.local/bin:/usr/local/bin:/usr/bin
+ExecStart=/usr/bin/env bash /home/ec2-user/wantbehelp-3rd-LXP-AI-Agent/scripts/start.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

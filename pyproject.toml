@@ -2,7 +2,7 @@
 name = "wantbehelp-3rd-lxp-ai-agent"
 version = "0.1.0"
 description = "Add your description here"
-readme = "README.md"
+readme = "readme.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiomysql>=0.3.2",
