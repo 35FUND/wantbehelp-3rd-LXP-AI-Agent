@@ -1,6 +1,5 @@
 import google.generativeai as genai
 import asyncio
-import os
 import boto3
 from app.core import settings
 from botocore.exceptions import ClientError
@@ -17,12 +16,18 @@ class BaseGeminiService :
             model_name=settings.MODEL_NAME
         )
 
-        self.s3_client = boto3.client(
-            's3',
-            aws_access_key_id = settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key = settings.AWS_SECRET_ACCESS_KEY,
-            region_name = settings.AWS_REGION
-        )
+        boto3_kwargs = {"region_name": settings.AWS_REGION}
+
+        # EC2에서는 IAM Role을 우선 사용하고, 로컬/개발 환경에서는 명시적 키를 허용한다.
+        if settings.AWS_ACCESS_KEY_ID and settings.AWS_SECRET_ACCESS_KEY:
+            boto3_kwargs.update(
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            )
+            if settings.AWS_SESSION_TOKEN:
+                boto3_kwargs["aws_session_token"] = settings.AWS_SESSION_TOKEN
+
+        self.s3_client = boto3.client("s3", **boto3_kwargs)
 
 
     async def download_from_s3(self, s3_key: str, local_path: str) :

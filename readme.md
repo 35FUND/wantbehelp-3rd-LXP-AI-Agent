@@ -110,6 +110,59 @@ Inspector AI Agent는 다음 15가지 카테고리를 기준으로 영상을 평
     ```bash
     uv add fastapi uvicorn google-generativeai boto3 pydantic-settings python-multipart asyncio sqlmodel aiomysql apscheduler greenlet --python 3.12
     ```
+
+## EC2 배포
+이 서비스는 FastAPI 프로세스 내부에서 APScheduler가 함께 돌기 때문에, EC2에서는 앱 인스턴스를 1개만 띄우는 구성이 안전하다.
+
+1. 서버 부트스트랩
+    ```bash
+    sudo bash scripts/bootstrap_ec2.sh
+    ```
+
+2. 애플리케이션 배치
+    ```bash
+    cd /home/ec2-user
+    git clone https://github.com/35FUND/wantbehelp-3rd-LXP-AI-Agent.git
+    cd wantbehelp-3rd-LXP-AI-Agent
+    cp .env.example .env
+    ```
+
+3. 환경 변수 입력
+    - `DATABASE_URL`: EC2에서 접근 가능한 MySQL 주소
+    - `S3_BUCKET_NAME`, `SHORTS_DIR`: 업로드 영상 위치
+    - `GEMINI_API_KEY`, `MODEL_NAME`
+    - AWS 자격 증명은 EC2 IAM Role 사용을 권장한다. IAM Role을 쓰면 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`는 비워둬도 된다.
+    - 상태값은 백엔드와 맞춰서 설정한다.
+      - 승인 후 상태: `SHORTS_APPROVED_STATUS`
+      - 반려 후 상태: `SHORTS_REJECTED_STATUS`
+      - 검수 대기 상태: `INSPECTION_PENDING_STATUS`
+
+4. systemd 등록
+    ```bash
+    sudo cp deploy/systemd/lxp-ai-agent.service /etc/systemd/system/lxp-ai-agent.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable lxp-ai-agent
+    sudo systemctl start lxp-ai-agent
+    sudo systemctl status lxp-ai-agent
+    ```
+
+5. Nginx 프록시 연결
+    ```bash
+    sudo cp deploy/nginx/lxp-ai-agent.conf /etc/nginx/conf.d/lxp-ai-agent.conf
+    sudo nginx -t
+    sudo systemctl restart nginx
+    ```
+
+6. 동작 확인
+    ```bash
+    curl http://127.0.0.1:8000/health
+    sudo journalctl -u lxp-ai-agent -f
+    ```
+
+운영 참고:
+- 스케줄러가 `INSPECTION_PENDING_STATUS` 상태의 숏츠를 주기적으로 조회한다.
+- 검수 성공 시 숏츠 상태는 `SHORTS_APPROVED_STATUS` 또는 `SHORTS_REJECTED_STATUS`로 변경된다.
+- S3 접근은 명시적 키가 없으면 boto3 기본 인증 체인을 타므로, EC2 IAM Role에 `s3:GetObject` 권한을 주는 구성이 가장 안전하다.
 ## 📤 API 사용법 (Example)
 `POST /check-video`
 

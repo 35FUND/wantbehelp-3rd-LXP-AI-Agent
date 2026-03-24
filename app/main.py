@@ -1,5 +1,5 @@
 # FastAPI 앱 실행 및 미들웨어 설정
-import logging, sys
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from app.api.v1 import inspector_router
@@ -32,12 +32,17 @@ async def lifespan(app: FastAPI) :
 
     start_scheduler()
     yield
-    scheduler.shutdown()
+    if scheduler.running:
+        scheduler.shutdown()
 
 app = FastAPI(
     title="LXP AI Agent", 
     version="1.0.0",
     lifespan=lifespan
 )
+
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 
 app.include_router(inspector_router, prefix="/api/v1")
